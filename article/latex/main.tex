@@ -1,0 +1,275 @@
+\documentclass[fleqn,10pt]{wlscirep}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[portuguese]{babel}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage{tikz}
+\usepackage{subcaption}
+\hypersetup{colorlinks=false, pdfborder={0 0 0}}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{gray!8},
+  frame=single,
+  breaklines=true,
+  language=Python,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+}
+
+\title{Modelagem Espacial de Din\^{a}micas de Doen\c{c}as Infecciosas via Aut\^{o}matos Celulares: Um Estudo com os Modelos SIR, SIS e SEIR Calibrados para Influenza Sazonal}
+
+\author[1,*]{Alana Barbalho Camara Lins}
+\affil[1]{Universidade Federal Rural de Pernambuco (UFRPE), Departamento de Ci\^{e}ncia da Computa\c{c}\~{a}o, Recife, PE, Brasil}
+\affil[*]{alana.lins@ufrpe.br}
+
+\keywords{Aut\^{o}mato Celular; Epidemiologia Computacional; SIR; Monte Carlo; R\textsubscript{0} Espacial; Influenza}
+
+\begin{abstract}
+Modelos compartimentais cl\'{a}ssicos assumem mistura homog\^{e}nea entre indiv\'{i}duos, o que pode n\~{a}o refletir adequadamente a estrutura espacial do contato infeccioso. Este trabalho descreve um simulador de aut\^{o}mato celular (AC) de c\'{o}digo aberto que embute os modelos SIR, SIS e SEIR em uma grade tor\'{o}ide 80~$\times$~80, com regras de transi\c{c}\~{a}o probabil\'{i}sticas locais derivadas das equa\c{c}\~{o}es compartimentais correspondentes. O simulador foi calibrado para influenza sazonal ($\beta = 0{,}18$,~$\gamma = 0{,}14$,~$\sigma = 0{,}50$) e utilizado em cinco experimentos controlados, cada um com $n = 30$ r\'{e}plicas Monte Carlo. Os resultados mostram que o n\'{u}mero de reprodu\c{c}\~{a}o sob as hip\'{o}teses do modelo espacial, $R_0^{AC} = [1-(1-\beta)^k]/\gamma$, difere substancialmente do valor de campo m\'{e}dio $R_0^{ODE} = \beta/\gamma$ para os mesmos par\^{a}metros --- em $\beta = 0{,}10$, por exemplo, $R_0^{ODE} = 0{,}71$ (subcr\'{i}tico) enquanto $R_0^{AC} = 4{,}07$, com taxa de ataque observada de 98{,}7\%. A topologia de Moore (8~vizinhos) produziu pico 48\% superior ao de Von~Neumann (4~vizinhos); o SEIR reduziu o pico em 71\% e o atrasou em 96 passos em rela\c{c}\~{a}o ao SIR; e a preval\^{e}ncia de pico decresceu com o tamanho da grade, comportamento n\~{a}o capturado pelas EDOs. Os padr\~{o}es geom\'{e}tricos das frentes de onda s\~{a}o consistentes com a dimens\~{a}o de similaridade dos AC discutida por Wolfram. O c\'{o}digo-fonte est\'{a} dispon\'{i}vel publicamente (ver \emph{Disponibilidade de C\'{o}digo}).
+\end{abstract}
+
+\begin{document}
+
+\flushbottom
+\maketitle
+\thispagestyle{empty}
+
+% ------------------------------------------------------------------
+\section*{Introdu\c{c}\~{a}o}
+
+Desde o trabalho seminal de Kermack e McKendrick\cite{Kermack:1927}, os modelos compartimentais baseados em equa\c{c}\~{o}es diferenciais ordin\'{a}rias (EDOs) t\^{e}m sido a ferramenta dominante na modelagem matem\'{a}tica de doen\c{c}as infecciosas. Arcabou\c{c}os como SIR, SIS e SEIR oferecem tratabilidade anal\'{i}tica e boas propriedades assint\'{o}ticas, mas pressup\~{o}em mistura homog\^{e}nea: qualquer suscet\'{i}vel pode entrar em contato com qualquer infeccioso com igual probabilidade. Essa hip\'{o}tese \'{e} conveniente, mas freq\"{u}entemente n\~{a}o se sustenta em popula\c{c}\~{o}es reais, onde a transmiss\~{a}o depende da proximidade f\'{i}sica entre indiv\'{i}duos\cite{Keeling:2008}.
+
+Os aut\^{o}matos celulares (AC) oferecem uma abordagem alternativa na qual a estrutura espacial \'{e} expl\'{i}cita por constru\c{c}\~{a}o. Um AC \'{e} definido por uma qu\'{a}drupla $(L,\,Q,\,V,\,\delta)$ --- grade discreta $L$, conjunto finito de estados $Q$, vizinhan\c{c}a $V$ e regra de transi\c{c}\~{a}o s\'{i}ncrona $\delta$ --- e produz din\^{a}micas coletivas a partir de intera\c{c}\~{o}es estritamente locais\cite{Wolfram:2002,Schiff:2007}. Wolfram\cite{Wolfram:2002} mostrou que mesmo regras elementares geram estruturas espaciais autossimilares cuja \emph{dimens\~{a}o de similaridade} depende da geometria da vizinhan\c{c}a; padr\~{o}es an\'{a}logos aparecem nas frentes de onda epidêmicas simuladas neste trabalho.
+
+A influenza sazonal foi escolhida como caso de refer\^{e}ncia por dispor de par\^{a}metros bem caracterizados: per\'{i}odo de incuba\c{c}\~{a}o de aproximadamente 2 dias, per\'{i}odo infeccioso m\'{e}dio de 7 dias e $R_0$ mediano estimado em 1{,}28\cite{Biggerstaff:2014}. Estudos anteriores com AC epidemiol\'{o}gicos\cite{Sirakoulis:2000,Fuentes:1999} j\'{a} indicaram que a estrutura espacial altera tanto as estimativas de $R_0$ quanto a geometria das ondas de propaga\c{c}\~{a}o; contudo, a compara\c{c}\~{a}o sistem\'{a}tica entre tipos de vizinhan\c{c}a e a quantifica\c{c}\~{a}o da variabilidade estoc\'{a}stica via Monte Carlo permanecem pouco exploradas nesse contexto.
+
+Este trabalho contribui com: (i) um simulador Python modular e vetorizado que implementa SIR, SIS e SEIR em uma grade 2D tor\'{o}ide; (ii) a formula\c{c}\~{a}o do n\'{u}mero de reprodu\c{c}\~{a}o espacial $R_0^{AC}$ v\'{a}lido sob as hip\'{o}teses do modelo, incluindo an\'{a}lise do comportamento de satura\c{c}\~{a}o em $1/\gamma$ quando $\beta \to 1$; e (iii) cinco experimentos com varredura de par\^{a}metros, cada um com 30 r\'{e}plicas independentes, tornando os resultados reprodut\'{i}veis.
+
+% ------------------------------------------------------------------
+\section*{Resultados}
+
+\subsection*{Taxa de transmiss\~{a}o $\beta$}
+
+Com $\gamma = 0{,}14$, $N = 80^2$, $I_0 = 5$ e vizinhan\c{c}a de Moore, $\beta$ foi variado entre 0{,}10 e 0{,}70 (Tabela~\ref{tab:beta}). O aumento de $\beta$ reduziu o passo do pico de $t \approx 59$ para $t \approx 19$ ($-68\%$) e elevou a magnitude do pico de 748~$\pm$~115 para 1.937~$\pm$~192 infectados simult\^{a}neos ($+159\%$), padr\~{a}o esperado e consistente com a literatura\cite{Keeling:2008}. Em $\beta = 0{,}10$, $R_0^{ODE} = 0{,}71$ indica extin\c{c}\~{a}o pela teoria de campo m\'{e}dio, mas a taxa de ataque observada foi de 98{,}7\% --- comportamento explicado por $R_0^{AC} = 4{,}07$ sob a vizinhan\c{c}a de Moore. Os valores de $R_0^{AC}$ convergem para $1/\gamma = 7{,}14$ conforme $\beta$ aumenta, refletindo a satura\c{c}\~{a}o da probabilidade de infec\c{c}\~{a}o $P = 1-(1-\beta)^k \leq 1$.
+
+\begin{table}[ht]
+\centering
+\caption{\label{tab:beta}Efeito de $\beta$ na din\^{a}mica epidêmica ($\gamma = 0{,}14$, Moore, SIR, $N = 80^2$, $n = 30$). M\'{e}dia $\pm$ d.p.}
+\begin{tabular}{ccccc}
+\toprule
+$\beta$ & $R_0^{ODE}$ & $R_0^{AC}$ & Pico infectados & Passo do pico \\
+\midrule
+0{,}10 & 0{,}71 & 4{,}07 & 748 $\pm$ 115   & 59 $\pm$ 13 \\
+0{,}18\textsuperscript{\dag} & \textbf{1{,}29} & \textbf{5{,}68} & \textbf{1.236 $\pm$ 175} & \textbf{33 $\pm$ 4} \\
+0{,}30 & 2{,}14 & 6{,}73 & 1.631 $\pm$ 179 & 24 $\pm$ 3 \\
+0{,}50 & 3{,}57 & 7{,}11 & 1.870 $\pm$ 198 & 20 $\pm$ 3 \\
+0{,}70 & 5{,}00 & 7{,}14 & 1.937 $\pm$ 192 & 19 $\pm$ 3 \\
+\bottomrule
+\end{tabular}
+\vspace{2pt}
+\newline\small\textsuperscript{\dag}Cen\'{a}rio de refer\^{e}ncia (influenza sazonal)\cite{Biggerstaff:2014}. $R_0^{ODE} = \beta/\gamma$; $R_0^{AC} = [1-(1-\beta)^8]/\gamma$.
+\end{table}
+
+\subsection*{Topologia da vizinhan\c{c}a}
+
+Sob $\beta = 0{,}30$ e $\gamma = 0{,}05$, a vizinhan\c{c}a de Moore ($k = 8$; Figura~\ref{fig:neighborhood}) produziu pico 48\% superior ao de Von~Neumann ($k = 4$) --- 3.154~$\pm$~180 \emph{vs.} 2.132~$\pm$~190 --- e antecipou o pico em 21 passos (Tabela~\ref{tab:neighborhood}). A redu\c{c}\~{a}o na dura\c{c}\~{a}o total foi modesta (6\%). Esses resultados s\~{a}o esperados: a probabilidade m\'{a}xima de infec\c{c}\~{a}o por passo \'{e} $1-0{,}70^8 = 0{,}942$ para Moore contra $1-0{,}70^4 = 0{,}760$ para Von~Neumann, de modo que maior conectividade local acelera a propaga\c{c}\~{a}o\cite{Fuentes:1999}. As geometrias das frentes de onda s\~{a}o igualmente distintas: Von~Neumann gera frentes em diamante (m\'{e}trica de Manhattan), Moore gera frentes aproximadamente circulares (m\'{e}trica de Chebyshev), padr\~{o}es coerentes com as propriedades de simetria de cada vizinhan\c{c}a.
+
+\begin{table}[ht]
+\centering
+\caption{\label{tab:neighborhood}Efeito da topologia de vizinhan\c{c}a ($\beta = 0{,}30$, $\gamma = 0{,}05$, SIR, $N = 80^2$, $n = 30$). M\'{e}dia $\pm$ d.p.}
+\begin{tabular}{ccccc}
+\toprule
+Vizinhan\c{c}a & $k$ & Pico infectados & Passo do pico & Dura\c{c}\~{a}o (passos) \\
+\midrule
+Von Neumann & 4 & 2.132 $\pm$ 190 & 52 $\pm$ 6 & 230 $\pm$ 28 \\
+Moore       & 8 & 3.154 $\pm$ 180 & 31 $\pm$ 3 & 215 $\pm$ 29 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\begin{subfigure}[b]{0.44\linewidth}
+\centering
+\begin{tikzpicture}[scale=0.62]
+  % grade 5x5
+  \foreach \x in {0,...,4} \foreach \y in {0,...,4} {
+    \fill[gray!15] (\x,\y) rectangle (\x+1,\y+1);
+    \draw[gray!60] (\x,\y) rectangle (\x+1,\y+1);
+  }
+  % celula central
+  \fill[black!80] (2,2) rectangle (3,3);
+  % vizinhos Von Neumann (cima, baixo, esq, dir)
+  \fill[orange!70] (2,3) rectangle (3,4); % cima
+  \fill[orange!70] (2,1) rectangle (3,2); % baixo
+  \fill[orange!70] (1,2) rectangle (2,3); % esq
+  \fill[orange!70] (3,2) rectangle (4,3); % dir
+  % redesenha bordas
+  \foreach \x in {0,...,4} \foreach \y in {0,...,4}
+    \draw[gray!60] (\x,\y) rectangle (\x+1,\y+1);
+  % legenda interna
+  \node[white, font=\bfseries\scriptsize] at (2.5,2.5) {C};
+  \node[font=\scriptsize] at (2.5,0.5) {$k=4$};
+\end{tikzpicture}
+\caption{Von Neumann}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.44\linewidth}
+\centering
+\begin{tikzpicture}[scale=0.62]
+  \foreach \x in {0,...,4} \foreach \y in {0,...,4} {
+    \fill[gray!15] (\x,\y) rectangle (\x+1,\y+1);
+    \draw[gray!60] (\x,\y) rectangle (\x+1,\y+1);
+  }
+  % celula central
+  \fill[black!80] (2,2) rectangle (3,3);
+  % vizinhos Moore (ortogonais + diagonais)
+  \foreach \dx in {-1,0,1} \foreach \dy in {-1,0,1} {
+    \ifnum\dx=0 \ifnum\dy=0 \else
+      \fill[orange!70] (2+\dx,2+\dy) rectangle (3+\dx,3+\dy);
+    \fi \else
+      \fill[orange!70] (2+\dx,2+\dy) rectangle (3+\dx,3+\dy);
+    \fi
+  }
+  \fill[black!80] (2,2) rectangle (3,3);
+  \foreach \x in {0,...,4} \foreach \y in {0,...,4}
+    \draw[gray!60] (\x,\y) rectangle (\x+1,\y+1);
+  \node[white, font=\bfseries\scriptsize] at (2.5,2.5) {C};
+  \node[font=\scriptsize] at (2.5,0.5) {$k=8$};
+\end{tikzpicture}
+\caption{Moore}
+\end{subfigure}
+\caption{Tipos de vizinhan\c{c}a implementados no aut\^{o}mato celular.
+A c\'{e}lula central (\textbf{C}, preta) representa o indiv\'{i}duo de refer\^{e}ncia;
+as c\'{e}lulas em laranja s\~{a}o seus vizinhos diretos, considerados no c\'{a}lculo
+da probabilidade de infec\c{c}\~{a}o $P = 1-(1-\beta)^{k_I}$.
+Von~Neumann ($k=4$) restringe o contato aos quatro vizinhos ortogonais,
+produzindo frentes de onda com geometria de diamante;
+Moore ($k=8$) inclui as diagonais e gera frentes aproximadamente circulares.}
+\label{fig:neighborhood}
+\end{figure}
+
+\subsection*{Estrutura do modelo compartmental}
+
+Com $\beta = 0{,}30$, $\gamma = 0{,}05$, $\sigma = 0{,}08$ e Moore, os tr\^{e}s modelos produziram regimes qualitativamente distintos (Tabela~\ref{tab:models}). O SIS manteve um estado end\^{e}mico persistente com preval\^{e}ncia simult\^{a}nea de 95{,}7\% (6.125~$\pm$~7): sem imunidade permanente, suscet\'{i}veis recuperados retornam ao estado~S e a infec\c{c}\~{a}o circula indefinidamente. O SEIR reduziu o pico em 71\% (908~$\pm$~108) e o atrasou em 96 passos em rela\c{c}\~{a}o ao SIR, corroborando o efeito amortecedor do per\'{i}odo latente j\'{a} documentado na literatura\cite{Beauchemin:2005,White:2007}. Do ponto de vista pr\'{a}tico, essa redu\c{c}\~{a}o indica que doen\c{c}as com per\'{i}odo de incuba\c{c}\~{a}o expressivo exercem press\~{a}o instant\^{a}nea menor sobre o sistema de sa\'{u}de, mesmo que o total acumulado de casos seja semelhante ao do SIR.
+
+\begin{table}[ht]
+\centering
+\caption{\label{tab:models}Compara\c{c}\~{a}o entre modelos compartimentais ($\beta = 0{,}30$, $\gamma = 0{,}05$, $\sigma = 0{,}08$, Moore, $N = 80^2$, $n = 30$). M\'{e}dia $\pm$ d.p.}
+\begin{tabular}{ccccc}
+\toprule
+Modelo & Pico infectados & Passo do pico & S (final) & Regime \\
+\midrule
+SIR  & 3.154 $\pm$ 180 & 31 $\pm$ 3   & 0 $\pm$ 0    & Transit\'{o}rio \\
+SIS  & 6.125 $\pm$ 7   & 199 $\pm$ 95 & 336 $\pm$ 17 & End\^{e}mico \\
+SEIR & 908 $\pm$ 108   & 127 $\pm$ 17 & 0 $\pm$ 0    & Transit\'{o}rio com atraso \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{Tamanho da grade}
+
+Mantendo $\beta = 0{,}30$, $\gamma = 0{,}05$ e $I_0 = 5$, a preval\^{e}ncia de pico decresceu de 65{,}8~$\pm$~3{,}5\% a 40{,}9~$\pm$~2{,}8\% ao aumentar a grade de $40^2$ a $120^2$ (Tabela~\ref{tab:density}). O mecanismo \'{e} geom\'{e}trico: em dom\'{i}nios menores, a frente iniciada por cinco c\'{e}lulas infectadas satura a popula\c{c}\~{a}o antes de declinar; em dom\'{i}nios maiores, a frente percorre dist\^{a}ncias proporcionalmente maiores, reduzindo a sobreposi\c{c}\~{a}o simult\^{a}nea. As EDOs produzem curvas normalizadas id\^{e}nticas independentemente de $N$, de modo que esse efeito de densidade \'{e} uma propriedade espec\'{i}fica do modelo espacial.
+
+\begin{table}[ht]
+\centering
+\caption{\label{tab:density}Efeito do tamanho da grade na preval\^{e}ncia de pico ($\beta = 0{,}30$, $\gamma = 0{,}05$, $I_0 = 5$, Moore, SIR, $n = 30$). M\'{e}dia $\pm$ d.p.}
+\begin{tabular}{ccc}
+\toprule
+Grade & $N$ & Pico I (\%) \\
+\midrule
+$40 \times 40$   & 1.600  & 65{,}8 $\pm$ 3{,}5 \\
+$60 \times 60$   & 3.600  & 57{,}5 $\pm$ 3{,}0 \\
+$80 \times 80$   & 6.400  & 49{,}3 $\pm$ 2{,}8 \\
+$100 \times 100$ & 10.000 & 44{,}0 $\pm$ 3{,}2 \\
+$120 \times 120$ & 14.400 & 40{,}9 $\pm$ 2{,}8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{N\'{u}mero inicial de infectados}
+
+Variar $I_0$ de 1 a 50 antecipou o pico em 36 passos ($t = 49 \to t = 13$) e elevou sua magnitude em 57\% (2.867~$\pm$~42 $\to$ 4.503~$\pm$~140). Com mais focos iniciais, m\'{u}ltiplas frentes de infec\c{c}\~{a}o se expandem simultaneamente, acelerando o crescimento efetivo nas fases precoces. A implica\c{c}\~{a}o pr\'{a}tica \'{e} que interven\c{c}\~{o}es de detec\c{c}\~{a}o e isolamento que reduzam $I_0$ de 10 para 1 podem atrasar o pico em cerca de 26 passos e reduzir sua magnitude em torno de 20\%, embora essas estimativas devam ser interpretadas dentro das limita\c{c}\~{o}es do modelo.
+
+% ------------------------------------------------------------------
+\section*{Discuss\~{a}o}
+
+O ponto de maior interesse metodol\'{o}gico deste trabalho \'{e} a diferen\c{c}a entre $R_0^{ODE}$ e $R_0^{AC}$ para os mesmos par\^{a}metros. Sob as hip\'{o}teses do modelo --- grade regular, vizinhan\c{c}a fixa, popula\c{c}\~{a}o est\'{a}tica ---, o n\'{u}mero de reprodu\c{c}\~{a}o espacial pode ser expresso como:
+\begin{equation}
+R_0^{AC} = \frac{1-(1-\beta)^k}{\gamma}
+\end{equation}
+que representa o n\'{u}mero esperado de novas infec\c{c}\~{o}es geradas por um \'{u}nico infeccioso durante seu per\'{i}odo de infec\c{c}\~{a}o em uma grade com $k$ vizinhos fixos. Essa express\~{a}o \'{e} v\'{a}lida especificamente sob as condi\c{c}\~{o}es aqui adotadas e n\~{a}o deve ser generalizada para estruturas de contato heterog\^{e}neas ou com mobilidade.
+
+Para vizinhan\c{c}a de Moore ($k = 8$), $R_0^{AC}$ tende a $1/\gamma$ conforme $\beta \to 1$, pois $P = 1-(1-\beta)^k$ \'{e} limitado por 1. Essa satura\c{c}\~{a}o \'{e} qualitativamente distinta da rela\c{c}\~{a}o linear $R_0^{ODE} = \beta/\gamma$ e tem implicac\~{a}o direta para calibra\c{c}\~{a}o: usar estimativas cl\'{i}nicas de $R_0$ para definir $\beta$ sem considerar a geometria da grade produz par\^{a}metros inconsistentes. A calibra\c{c}\~{a}o adequada requer inverter $1-(1-\beta)^k = R_0^{alvo} \cdot \gamma$ numericamente.
+
+As frentes de onda epidêmicas apresentaram geometrias coerentes com a m\'{e}trica de cada vizinhan\c{c}a --- diamante para Von~Neumann, circular para Moore ---, correspond\^{e}ncia an\'{a}loga \`{a} descrita por Wolfram\cite{Wolfram:2002} para AC elementares, nos quais a dimens\~{a}o de similaridade dos padr\~{o}es autossimilares reflete a topologia local. No contexto epidemiol\'{o}gico, isso sugere que a escolha da vizinhan\c{c}a influi n\~{a}o apenas na velocidade de propaga\c{c}\~{a}o, mas tamb\'{e}m na forma da frente e, por consequ\^{e}ncia, no ritmo de satura\c{c}\~{a}o espacial da epidemia.
+
+\subsection*{Limita\c{c}\~{o}es}
+
+O modelo \'{e} intencionalmente simplificado e suas conclus\~{o}es devem ser interpretadas dentro desse escopo. Os indiv\'{i}duos s\~{a}o est\'{a}ticos em uma grade regular, sem qualquer forma de mobilidade, o que \'{e} particularmente restritivo dado que o deslocamento humano \'{e} um dos principais mecanismos de difus\~{a}o geogr\'{a}fica de epidemias\cite{Keeling:2008}. A popula\c{c}\~{a}o \'{e} homog\^{e}nea: n\~{a}o h\'{a} estrutura et\'{a}ria, diferen\c{c}as de suscetibilidade, imunidade pr\'{e}via ou grupos de risco, fatores com influ\^{e}ncia documentada na din\^{a}mica da influenza\cite{Biggerstaff:2014}. A vizinhan\c{c}a \'{e} fixa e sim\'{e}trica, ao contr\'{a}rio das redes de contato reais, que apresentam distribui\c{c}\~{o}es heterog\^{e}neas de grau e estrutura comunit\'{a}ria. N\~{a}o s\~{a}o considerados vacinac\~{a}o, tratamento ou interven\c{c}\~{o}es n\~{a}o farmacol\'{o}gicas. Os par\^{a}metros $\beta$ e $\gamma$ s\~{a}o constantes ao longo do tempo, sem sazonalidade. Por fim, o horizonte de 350 passos pode ser insuficiente para capturar o comportamento oscilatório de longo prazo do modelo SIS.
+
+Essas escolhas s\~{a}o pr\'{o}prias de um modelo explorat\'{o}rio voltado a avaliar isoladamente o efeito de cada par\^{a}metro em ambiente controlado. Extens\~{o}es naturais incluem mobilidade via aut\^{o}matos de g\'{a}s em rede (\emph{Lattice-Gas CA}), estratifica\c{c}\~{a}o et\'{a}ria, imunidade parcial e calibra\c{c}\~{a}o com dados de vigilância (SIVEP-Gripe, WHO FluNet).
+
+% ------------------------------------------------------------------
+\section*{M\'{e}todos}
+
+\subsection*{Aut\^{o}mato celular}
+
+A grade tor\'{o}ide $N \times N$ opera com atualiza\c{c}\~{a}o s\'{i}ncrona: todas as c\'{e}lulas avaliam seu pr\'{o}ximo estado a partir dos vizinhos em $t$ e transitam simultaneamente. Condi\c{c}\~{o}es de contorno peri\'{o}dicas garantem cardinalidade de vizinhan\c{c}a uniforme em toda a grade. S\~{a}o consideradas duas vizinhan\c{c}as: Von~Neumann ($k = 4$, m\'{e}trica de Manhattan) e Moore ($k = 8$, m\'{e}trica de Chebyshev).
+
+\subsection*{Regras de transi\c{c}\~{a}o}
+
+O espa\c{c}o de estados \'{e} $Q = \{S,\,E,\,I,\,R\}$, com as seguintes probabilidades de transi\c{c}\~{a}o por passo:
+\begin{itemize}
+\item \textbf{S $\to$ I (SIR/SIS):} $P = 1-(1-\beta)^{k_I}$, com $k_I$ = n\'{u}mero de vizinhos infectados
+\item \textbf{S $\to$ E (SEIR):} mesma f\'{o}rmula; c\'{e}lulas expostas n\~{a}o transmitem
+\item \textbf{E $\to$ I (SEIR):} $P = \sigma$ por passo (lat\^{e}ncia geom\'{e}trica, m\'{e}dia $1/\sigma$)
+\item \textbf{I $\to$ R (SIR/SEIR) ou I $\to$ S (SIS):} $P = \gamma$ por passo (recupera\c{c}\~{a}o geom\'{e}trica, m\'{e}dia $1/\gamma$)
+\end{itemize}
+Par\^{a}metros de refer\^{e}ncia para influenza: $\beta = 0{,}18$, $\gamma = 0{,}14$ e $\sigma = 0{,}50$\cite{Biggerstaff:2014}.
+
+\subsection*{Implementa\c{c}\~{a}o}
+
+As contagens de vizinhos infectados s\~{a}o obtidas por convolu\c{c}\~{a}o 2D com \texttt{scipy.signal.convolve2d} (\texttt{boundary='wrap'}), eliminando la\c{c}os Python expl\'{i}citos. Uma simula\c{c}\~{a}o de 300 passos em $80 \times 80$ conclui em $\approx 0{,}04$~s.
+
+\begin{lstlisting}[caption={N\'{u}cleo da regra de atualiza\c{c}\~{a}o (Moore).}]
+kernel = np.array([[1,1,1],[1,0,1],[1,1,1]])
+n_inf = convolve2d((state == I).astype(np.float32),
+                   kernel, mode='same', boundary='wrap')
+p_inf = 1.0 - (1.0 - beta) ** n_inf
+new_infections = (state == S) & (np.random.random(state.shape) < p_inf)
+\end{lstlisting}
+
+\subsection*{Protocolo Monte Carlo}
+
+Cada condi\c{c}\~{a}o foi executada $n = 30$ vezes com sementes independentes (\texttt{seed = 42 + 17r}, $r = 0,\ldots,29$). S\~{a}o reportados m\'{e}dia e IC~95\% ($\bar{x} \pm 1{,}96\,s/\sqrt{n}$) para cada m\'{e}trica.
+
+\subsection*{Uso de intelig\^{e}ncia artificial}
+
+O desenvolvimento e a revis\~{a}o do simulador contaram com aux\'{i}lio do modelo \textbf{Claude Sonnet~4.6} (Anthropic). O hist\'{o}rico completo de prompts utilizado --- abrangendo projeto das regras, vetoriza\c{c}\~{a}o, valida\c{c}\~{a}o Monte Carlo e verifica\c{c}\~{a}o num\'{e}rica dos resultados --- est\'{a} arquivado no reposit\'{o}rio p\'{u}blico.
+
+% ------------------------------------------------------------------
+\section*{Disponibilidade de C\'{o}digo}
+
+C\'{o}digo-fonte, scripts de experimento, figuras e log de prompts de IA est\~{a}o dispon\'{i}veis em:
+
+\begin{center}
+\url{https://github.com/alanabclins/Cellular-Automata-and-Epidemiology-Computing}
+\end{center}
+
+\begin{lstlisting}[language=bash]
+git clone https://github.com/alanabclins/Cellular-Automata-and-Epidemiology-Computing
+cd ca-epidemiology/src && python3 main.py --mode all
+\end{lstlisting}
+
+Ambiente: Python~3.10, NumPy~1.24, SciPy~1.11, Matplotlib~3.7, Pandas~2.0.
+
+% ------------------------------------------------------------------
+\bibliography{sample}
+
+\end{document}
