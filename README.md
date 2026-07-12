@@ -31,7 +31,8 @@ Simulador epidemiológico baseado em autômatos celulares (AC) implementando os 
 ├── figures/              # Figuras geradas pelos experimentos
 │
 └── article/
-    └── latex/            # Manuscrito em formato Nature Scientific Reports
+    ├── Modelagem_Espacial_CA_Epidemiologia_UFRPE2026.pdf  # Artigo em PDF
+    └── latex/            # Fonte LaTeX (Nature Scientific Reports)
         ├── main.tex
         ├── sample.bib
         └── wlscirep.cls  (+ arquivos de estilo)
@@ -88,7 +89,10 @@ que difere do valor de campo médio $R_0^{ODE} = \beta/\gamma$ e satura em $1/\g
 
 ## Artigo
 
-O manuscrito completo está em `article/latex/` e pode ser compilado diretamente no [Overleaf](https://www.overleaf.com) via upload do conteúdo da pasta.
+O manuscrito completo está disponível em dois formatos:
+
+- **PDF:** [`article/Modelagem_Espacial_CA_Epidemiologia_UFRPE2026.pdf`](article/Modelagem_Espacial_CA_Epidemiologia_UFRPE2026.pdf)
+- **LaTeX:** pasta `article/latex/`, compilável diretamente no [Overleaf](https://www.overleaf.com) via upload da pasta
 
 ---
 
